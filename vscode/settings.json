@@ -1,0 +1,3 @@
+{
+  "rust-analyzer.cargo.target": "armv7-linux-androideabi"
+}

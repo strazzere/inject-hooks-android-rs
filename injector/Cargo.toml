@@ -1,0 +1,14 @@
+[package]
+name = "injector"
+version = "1.0.0"
+edition = "2021"
+
+# Authors and other optional metadata
+authors = ["Tim Strazzere <tim@strazzere.com"]
+description = "Remotely inject a shared library into a running process"
+license = "Apache 2.0"
+repository = "https://github.com/strazzere/inject-hooks-android-rs/injector"
+
+[dependencies]
+libc = "0.2"
+nix = { version = "0.29.0", features = ["ptrace", "process"] }
