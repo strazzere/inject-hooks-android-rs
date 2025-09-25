@@ -7,7 +7,6 @@ use std::ffi::CString;
 extern "C" {
     fn fopen(filename: *const std::os::raw::c_char, mode: *const std::os::raw::c_char) -> *mut std::os::raw::c_void;
     fn fread(ptr: *mut std::os::raw::c_void, size: usize, count: usize, stream: *mut std::os::raw::c_void) -> usize;
-    fn fwrite(ptr: *const std::os::raw::c_void, size: usize, count: usize, stream: *mut std::os::raw::c_void) -> usize;
     fn fclose(stream: *mut std::os::raw::c_void) -> i32;
 }
 
