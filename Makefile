@@ -1,5 +1,6 @@
-# Default target triple (used only if cross is available)
-TARGET ?= armv7-linux-androideabi
+# Target triples for Android
+ARM_TARGETS := armv7-linux-androideabi aarch64-linux-android
+DEFAULT_TARGET ?= armv7-linux-androideabi
 HOOK_OUT ?= injector/assets/
 FLAGS ?= --release
 
@@ -20,10 +21,10 @@ ifeq ($(USE_LOCAL),1)
   BUILD_TOOL := cargo
   TARGET_ARG :=
   TARGET_DIR :=
+  TARGETS := $(DEFAULT_TARGET)
 else
   BUILD_TOOL := cross
-  TARGET_ARG := --target $(TARGET)
-  TARGET_DIR := $(TARGET)/
+  TARGETS := $(ARM_TARGETS)
 endif
 
 SHARED_EXT := so
@@ -33,12 +34,28 @@ SHARED_EXT := so
 all: injector
 
 hook:
-	$(BUILD_TOOL) build $(TARGET_ARG) --manifest-path hook/Cargo.toml $(FLAGS)
+ifeq ($(USE_LOCAL),1)
+	$(BUILD_TOOL) build --manifest-path hook/Cargo.toml $(FLAGS)
 	mkdir -p $(HOOK_OUT)
-	cp hook/target/$(TARGET_DIR)$(if $(findstring --release,$(FLAGS)),release,debug)/libhook.$(SHARED_EXT) $(HOOK_OUT)
+	cp hook/target/$(if $(findstring --release,$(FLAGS)),release,debug)/libhook.$(SHARED_EXT) $(HOOK_OUT)
+else
+	@for target in $(TARGETS); do \
+		echo "Building hook for $$target..."; \
+		$(BUILD_TOOL) build --target $$target --manifest-path hook/Cargo.toml $(FLAGS); \
+		mkdir -p $(HOOK_OUT); \
+		cp hook/target/$$target/$(if $(findstring --release,$(FLAGS)),release,debug)/libhook.$(SHARED_EXT) $(HOOK_OUT)libhook-$$target.$(SHARED_EXT); \
+	done
+endif
 
 injector: hook
-	$(BUILD_TOOL) build $(TARGET_ARG) --manifest-path injector/Cargo.toml $(FLAGS)
+ifeq ($(USE_LOCAL),1)
+	$(BUILD_TOOL) build --manifest-path injector/Cargo.toml $(FLAGS)
+else
+	@for target in $(TARGETS); do \
+		echo "Building injector for $$target..."; \
+		$(BUILD_TOOL) build --target $$target --manifest-path injector/Cargo.toml $(FLAGS); \
+	done
+endif
 
 debug:
 	$(MAKE) FLAGS= USE_LOCAL=$(USE_LOCAL) hook
