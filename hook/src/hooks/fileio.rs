@@ -24,6 +24,7 @@ static mut REAL_FOPEN: Option<FopenType> = None;
 static mut REAL_FREAD: Option<FreadType> = None;
 
 pub unsafe fn init() {
+    logd!("[fileio] init() called - enabling GOT patching with debug output");
     hook_file_io();
 }
 pub unsafe fn hook_file_io() {
@@ -35,9 +36,12 @@ pub unsafe fn hook_file_io() {
         .and_then(|p| p.to_str().map(|s| s.to_string()));
 
     let exe_path = match current_exe {
-        Some(ref path) => {
+        Some(path) => {
             logd!("[*] Current process executable: {}", path);
-            path
+            // Remove the (deleted) suffix if present
+            let clean_path = path.replace(" (deleted)", "");
+            logd!("[*] Cleaned executable path: {}", clean_path);
+            clean_path
         }
         None => {
             logd!("[-] Failed to get current process executable path");
@@ -45,7 +49,7 @@ pub unsafe fn hook_file_io() {
         }
     };
 
-    let base = match find_module_base(exe_path) {
+    let base = match find_module_base(&exe_path) {
         Some(b) => b,
         None => {
             logd!("[-] Failed to find module base for current process: {}", exe_path);
@@ -54,7 +58,7 @@ pub unsafe fn hook_file_io() {
     };
 
     // Find symbol you want to hook
-    let fopen_got_offset = find_got_entry_for_symbol(exe_path, "fopen")
+    let fopen_got_offset = find_got_entry_for_symbol(&exe_path, "fopen")
     .expect("Could not find GOT entry for fopen");
 
     logd!("[*] Calculated GOT entry address: {:#x}", fopen_got_offset);
@@ -73,7 +77,7 @@ pub unsafe fn hook_file_io() {
     logd!("[*] Absolute GOT address = 0x{:x}", base + fopen_got_offset as usize);
 
 
-    let fread_got_offset = find_got_entry_for_symbol(exe_path, "fread")
+    let fread_got_offset = find_got_entry_for_symbol(&exe_path, "fread")
     .expect("Could not find GOT entry for fread");
 
     logd!("[*] Calculated GOT entry address: {:#x}", fread_got_offset);
