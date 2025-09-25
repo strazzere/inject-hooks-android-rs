@@ -1,0 +1,8 @@
+[package]
+name = "victim"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "victim"
+path = "src/main.rs"
