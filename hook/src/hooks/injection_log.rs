@@ -31,7 +31,7 @@ pub unsafe fn log_injection() {
     }
 
     // Log library address
-    let addr_msg = format!("Library loaded at: {:p}", &log_injection as *const _);
+    let addr_msg = format!("Library loaded at: {:p}", log_injection as *const ());
     if let Ok(c_addr_msg) = CString::new(addr_msg) {
         __android_log_print(ANDROID_LOG_INFO, tag.as_ptr(), fmt.as_ptr(), c_addr_msg.as_ptr());
     }

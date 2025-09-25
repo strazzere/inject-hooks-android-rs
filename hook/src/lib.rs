@@ -1,6 +1,5 @@
 mod hooks;
 mod patch;
-mod hook;
 mod log;
 mod elf;
 
