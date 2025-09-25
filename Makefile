@@ -29,7 +29,7 @@ endif
 
 SHARED_EXT := so
 
-.PHONY: all hook injector debug clean
+.PHONY: all hook injector debug clean deploy
 
 all: injector
 
@@ -64,3 +64,50 @@ debug:
 clean:
 	cargo clean --manifest-path hook/Cargo.toml
 	cargo clean --manifest-path injector/Cargo.toml
+
+deploy: injector
+	@echo "Checking for ADB devices..."
+	@if ! command -v adb >/dev/null 2>&1; then \
+		echo "Error: adb not found. Please install Android SDK platform-tools."; \
+		exit 1; \
+	fi
+	@if ! adb devices | grep -q "device$$"; then \
+		echo "Error: No ADB device connected. Please connect a device and enable USB debugging."; \
+		exit 1; \
+	fi
+	@echo "Detecting device architecture..."
+	@DEVICE_ARCH=$$(adb shell getprop ro.product.cpu.abi 2>/dev/null || adb shell getprop ro.product.cpu.abilist | cut -d',' -f1 2>/dev/null); \
+	if [ -z "$$DEVICE_ARCH" ]; then \
+		echo "Error: Could not detect device architecture."; \
+		exit 1; \
+	fi; \
+	echo "Device architecture: $$DEVICE_ARCH"; \
+	if echo "$$DEVICE_ARCH" | grep -q "arm64\|aarch64"; then \
+		TARGET_ARCH="aarch64-linux-android"; \
+		echo "Detected 64-bit ARM device, using $$TARGET_ARCH"; \
+	elif echo "$$DEVICE_ARCH" | grep -q "armeabi\|armv7"; then \
+		TARGET_ARCH="armv7-linux-androideabi"; \
+		echo "Detected 32-bit ARM device, using $$TARGET_ARCH"; \
+	else \
+		echo "Error: Unsupported device architecture: $$DEVICE_ARCH"; \
+		exit 1; \
+	fi; \
+	echo "Pushing binaries to device..."; \
+	if [ -f "injector/target/$$TARGET_ARCH/$(if $(findstring --release,$(FLAGS)),release,debug)/injector" ]; then \
+		adb push "injector/target/$$TARGET_ARCH/$(if $(findstring --release,$(FLAGS)),release,debug)/injector" /data/local/tmp/; \
+		echo "Pushed injector binary"; \
+	else \
+		echo "Error: Injector binary not found for $$TARGET_ARCH"; \
+		exit 1; \
+	fi; \
+	if [ -f "$(HOOK_OUT)libhook-$$TARGET_ARCH.$(SHARED_EXT)" ]; then \
+		adb push "$(HOOK_OUT)libhook-$$TARGET_ARCH.$(SHARED_EXT)" /data/local/tmp/; \
+		echo "Pushed hook library"; \
+	elif [ -f "$(HOOK_OUT)libhook.$(SHARED_EXT)" ]; then \
+		adb push "$(HOOK_OUT)libhook.$(SHARED_EXT)" /data/local/tmp/; \
+		echo "Pushed hook library (fallback)"; \
+	else \
+		echo "Error: Hook library not found for $$TARGET_ARCH"; \
+		exit 1; \
+	fi; \
+	echo "Deployment completed successfully!"
