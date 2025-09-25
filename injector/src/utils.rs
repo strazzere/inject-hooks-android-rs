@@ -45,8 +45,6 @@ pub fn get_pid(process_name: &str) -> Option<i32> {
                 if name == target || name == target_base {
                     vlog!("[pid] match via comm: pid={} name='{}'", pid, name);
                     return Some(pid);
-                } else {
-                    vlog!("[pid] comm nope: pid={} name='{}'", pid, name);
                 }
             }
         }
@@ -69,13 +67,6 @@ pub fn get_pid(process_name: &str) -> Option<i32> {
                             first_base
                         );
                         return Some(pid);
-                    } else {
-                        vlog!(
-                            "[pid] cmdline nope: pid={} argv0='{}' base='{}'",
-                            pid,
-                            first,
-                            first_base
-                        );
                     }
                 }
             }
@@ -129,6 +120,7 @@ fn parse_hex_addr_to_u64(s: &str) -> Option<u64> {
 
 fn dump_module_candidates_from_maps(pid: i32, module_name: &str) {
     let maps_path = format!("/proc/{}/maps", pid);
+
     if let Ok(file) = File::open(&maps_path) {
         eprintln!("[maps] candidates for pid={} module='{}':", pid, module_name);
         for line in BufReader::new(file).lines().flatten() {
@@ -143,6 +135,7 @@ fn dump_module_candidates_from_maps(pid: i32, module_name: &str) {
 
 pub fn get_module_base_addr(pid: i32, module_name: &str) -> Option<u64> {
     let maps_path = format!("/proc/{}/maps", pid);
+
     let file = match File::open(&maps_path) {
         Ok(f) => f,
         Err(e) => {
