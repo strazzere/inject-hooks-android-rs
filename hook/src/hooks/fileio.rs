@@ -29,17 +29,32 @@ pub unsafe fn init() {
 pub unsafe fn hook_file_io() {
     logd!("Attempting got patching on fopen");
 
-    // This could be generalized to look up what process it currently is injected into
-    let base = match find_module_base("/system/bin/target_process") {
+    // Try to find the current process executable from /proc/self/exe
+    let current_exe = std::fs::read_link("/proc/self/exe")
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_string()));
+
+    let exe_path = match current_exe {
+        Some(ref path) => {
+            logd!("[*] Current process executable: {}", path);
+            path
+        }
+        None => {
+            logd!("[-] Failed to get current process executable path");
+            return;
+        }
+    };
+
+    let base = match find_module_base(exe_path) {
         Some(b) => b,
         None => {
-            logd!("[-] Failed to find module base for /system/bin/target_process");
+            logd!("[-] Failed to find module base for current process: {}", exe_path);
             return;
         }
     };
 
     // Find symbol you want to hook
-    let fopen_got_offset = find_got_entry_for_symbol("/system/bin/target_process", "fopen")
+    let fopen_got_offset = find_got_entry_for_symbol(exe_path, "fopen")
     .expect("Could not find GOT entry for fopen");
 
     logd!("[*] Calculated GOT entry address: {:#x}", fopen_got_offset);
@@ -54,11 +69,11 @@ pub unsafe fn hook_file_io() {
     REAL_FOPEN = Some(std::mem::transmute(fopen_orig));
 
     logd!("[*] GOT entry for 'fopen' offset = 0x{:x}", fopen_got_offset);
-    logd!("[*] Base of target_process = 0x{:x}", base);
+    logd!("[*] Base of current process = 0x{:x}", base);
     logd!("[*] Absolute GOT address = 0x{:x}", base + fopen_got_offset as usize);
 
 
-    let fread_got_offset = find_got_entry_for_symbol("/system/bin/target_process", "fread")
+    let fread_got_offset = find_got_entry_for_symbol(exe_path, "fread")
     .expect("Could not find GOT entry for fread");
 
     logd!("[*] Calculated GOT entry address: {:#x}", fread_got_offset);
@@ -72,7 +87,7 @@ pub unsafe fn hook_file_io() {
     REAL_FREAD = Some(std::mem::transmute(fread_orig));
 
     logd!("[*] GOT entry for 'fread' offset = 0x{:x}", fread_got_offset);
-    logd!("[*] Base of target_process = 0x{:x}", base);
+    logd!("[*] Base of current process = 0x{:x}", base);
     logd!("[*] Absolute GOT address = 0x{:x}", base + fread_got_offset as usize);
 }
 
