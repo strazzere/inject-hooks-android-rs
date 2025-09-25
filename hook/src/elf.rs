@@ -10,17 +10,20 @@ pub fn find_got_entry_for_symbol(path: &str, symbol: &str) -> Option<u64> {
     let elf = Elf::parse(&buffer).ok()?;
 
     // Handle both REL and RELA
-    for rel in elf.dynrels.iter().chain(elf.pltrelocs.iter()) {
+    for (i, rel) in elf.dynrels.iter().chain(elf.pltrelocs.iter()).enumerate() {
         let sym_idx = rel.r_sym;
         if let Some(sym) = elf.dynsyms.get(sym_idx) {
             if let Some(name) = elf.dynstrtab.get_at(sym.st_name).map(|r| r) {
+                logd!("[*] Relocation {}: symbol '{}' at offset 0x{:x}", i, name, rel.r_offset);
                 if name == symbol {
+                    logd!("[*] Found GOT entry for '{}' at offset 0x{:x}", symbol, rel.r_offset);
                     return Some(rel.r_offset);
                 }
             }
         }
     }
 
+    logd!("[-] Could not find GOT entry for symbol '{}'", symbol);
     None
 }
 
