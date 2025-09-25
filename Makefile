@@ -29,7 +29,7 @@ endif
 
 SHARED_EXT := so
 
-.PHONY: all hook injector debug clean deploy
+.PHONY: all hook injector victim debug clean deploy
 
 all: injector
 
@@ -57,15 +57,27 @@ else
 	done
 endif
 
+victim:
+ifeq ($(USE_LOCAL),1)
+	$(BUILD_TOOL) build --manifest-path victim/Cargo.toml $(FLAGS)
+else
+	@for target in $(TARGETS); do \
+		echo "Building victim for $$target..."; \
+		$(BUILD_TOOL) build --target $$target --manifest-path victim/Cargo.toml $(FLAGS); \
+	done
+endif
+
 debug:
 	$(MAKE) FLAGS= USE_LOCAL=$(USE_LOCAL) hook
 	$(MAKE) FLAGS= USE_LOCAL=$(USE_LOCAL) injector
+	$(MAKE) FLAGS= USE_LOCAL=$(USE_LOCAL) victim
 
 clean:
 	cargo clean --manifest-path hook/Cargo.toml
 	cargo clean --manifest-path injector/Cargo.toml
+	cargo clean --manifest-path victim/Cargo.toml
 
-deploy: injector
+deploy: injector victim
 	@echo "Checking for ADB devices..."
 	@if ! command -v adb >/dev/null 2>&1; then \
 		echo "Error: adb not found. Please install Android SDK platform-tools."; \
@@ -108,6 +120,13 @@ deploy: injector
 		echo "Pushed hook library (fallback)"; \
 	else \
 		echo "Error: Hook library not found for $$TARGET_ARCH"; \
+		exit 1; \
+	fi; \
+	if [ -f "victim/target/$$TARGET_ARCH/$(if $(findstring --release,$(FLAGS)),release,debug)/victim" ]; then \
+		adb push "victim/target/$$TARGET_ARCH/$(if $(findstring --release,$(FLAGS)),release,debug)/victim" /data/local/tmp/; \
+		echo "Pushed victim binary"; \
+	else \
+		echo "Error: Victim binary not found for $$TARGET_ARCH"; \
 		exit 1; \
 	fi; \
 	echo "Deployment completed successfully!"
