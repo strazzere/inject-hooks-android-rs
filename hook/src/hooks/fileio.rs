@@ -111,6 +111,7 @@ pub unsafe extern "C" fn hooked_fopen(path: *const c_char, mode: *const c_char) 
     let file = real_fopen(path, mode);
 
     let path_str = path.as_ref().map(|_| CStr::from_ptr(path).to_string_lossy()).unwrap_or("<null>".into());
+    #[cfg(debug_assertions)]
     let mode_str = mode.as_ref().map(|_| CStr::from_ptr(mode).to_string_lossy()).unwrap_or("<null>".into());
 
     logd!("[+] fopen checking: {} w/ {} ", path_str, mode_str);
