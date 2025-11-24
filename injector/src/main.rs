@@ -2,9 +2,11 @@ mod injector;
 mod utils;
 mod ptrace;
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 use injector::inject_library;
 use utils::{disable_selinux, get_pid, is_selinux_enabled};
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
@@ -33,4 +35,10 @@ fn main() {
     } else {
         eprintln!("Process not found: {}", process_name);
     }
+}
+
+#[cfg(not(any(target_arch = "aarch64", target_arch = "arm")))]
+fn main() {
+    eprintln!("This injector only supports aarch64 and arm architectures");
+    std::process::exit(1);
 }
