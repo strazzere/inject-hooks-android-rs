@@ -6,7 +6,9 @@ use libc::{pid_t, mmap, munmap, RTLD_NOW, RTLD_LOCAL, PROT_READ, PROT_WRITE, MAP
 #[cfg(target_arch = "aarch64")]
 use libc::PROT_EXEC;
 
-use crate::ptrace::{ptrace_attach, ptrace_detach, ptrace_write, call_remote_function};
+use crate::ptrace::{ptrace_attach, ptrace_detach, ptrace_write};
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
+use crate::ptrace::call_remote_function;
 use crate::utils::get_remote_function_addr;
 
 /// Choose a reasonable default path for libc based on target pointer width
@@ -69,6 +71,7 @@ pub fn get_linker_path() -> String {
     resolve_if_symlink(default_linker_path())
 }
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 pub fn inject_library(pid: pid_t, library_path: &str) -> Result<u64, Box<dyn std::error::Error>> {
     ptrace_attach(pid)?;
 
@@ -87,6 +90,7 @@ pub fn inject_library(pid: pid_t, library_path: &str) -> Result<u64, Box<dyn std
     Ok(handle)
 }
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 fn call_mmap(pid: pid_t, length: usize) -> Result<u64, Box<dyn std::error::Error>> {
     #[cfg(target_arch = "aarch64")]
     {
@@ -131,6 +135,7 @@ fn call_mmap(pid: pid_t, length: usize) -> Result<u64, Box<dyn std::error::Error
     }
 }
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 fn call_munmap(pid: pid_t, addr: u64, length: usize) -> Result<u64, Box<dyn std::error::Error>> {
     #[cfg(target_arch = "aarch64")]
     {
@@ -161,6 +166,7 @@ fn call_munmap(pid: pid_t, addr: u64, length: usize) -> Result<u64, Box<dyn std:
     }
 }
 
+#[cfg(any(target_arch = "aarch64", target_arch = "arm"))]
 fn call_dlopen(pid: pid_t, lib_path: &str) -> Result<u64, Box<dyn std::error::Error>> {
     let local = libc::dlopen as usize as u64;
 
