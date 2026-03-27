@@ -11,4 +11,4 @@ repository = "https://github.com/strazzere/inject-hooks-android-rs/injector"
 
 [dependencies]
 libc = "0.2"
-nix = { version = "0.29.0", features = ["ptrace", "process"] }
+nix = { version = "0.31.2", features = ["ptrace", "process"] }
