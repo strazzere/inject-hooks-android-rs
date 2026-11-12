@@ -1,5 +1,5 @@
 use libc::{c_char, c_void, FILE, size_t};
-use once_cell::sync::Lazy;
+use once_cell::sync::{Lazy, OnceCell};
 use std::collections::HashSet;
 use std::ffi::CStr;
 use std::sync::Mutex;
@@ -20,8 +20,8 @@ static TRACKED_FILES: Lazy<Mutex<HashSet<UnsafeFilePtr>>> = Lazy::new(|| Mutex::
 type FopenType = unsafe extern "C" fn(*const c_char, *const c_char) -> *mut FILE;
 type FreadType = unsafe extern "C" fn(*mut c_void, size_t, size_t, *mut FILE) -> size_t;
 
-static mut REAL_FOPEN: Option<FopenType> = None;
-static mut REAL_FREAD: Option<FreadType> = None;
+static REAL_FOPEN: OnceCell<FopenType> = OnceCell::new();
+static REAL_FREAD: OnceCell<FreadType> = OnceCell::new();
 
 pub unsafe fn init() {
     logd!("[fileio] init() called - enabling GOT patching with debug output");
@@ -66,11 +66,14 @@ pub unsafe fn hook_file_io() {
     logd!("[*] GOT before: {:?}", *fopen_got_ptr);
 
     // Replace GOT ptr with our ptr
-    let fopen_orig = patch_got_entry(fopen_got_ptr, hooked_fopen as *const c_void);
+    let fopen_orig = patch_got_entry(fopen_got_ptr, hooked_fopen as *const c_void)
+        .expect("Could not make fopen GOT entry writable");
     logd!("[*] GOT after: {:?}", *fopen_got_ptr);
 
     logd!("[+] fopen GOT patch applied: {:#x} -> {:?}", fopen_got_offset, hooked_fopen as *const c_void);
-    REAL_FOPEN = Some(std::mem::transmute(fopen_orig));
+    if REAL_FOPEN.set(std::mem::transmute::<*const c_void, FopenType>(fopen_orig)).is_err() {
+        logd!("[-] REAL_FOPEN was already set; ignoring");
+    }
 
     logd!("[*] GOT entry for 'fopen' offset = 0x{:x}", fopen_got_offset);
     logd!("[*] Base of current process = 0x{:x}", base);
@@ -84,11 +87,14 @@ pub unsafe fn hook_file_io() {
 
     let fread_got_ptr = (base + fread_got_offset as usize) as *mut *const c_void;
     logd!("[*] GOT before: {:?}", *fread_got_ptr);
-    let fread_orig = patch_got_entry(fread_got_ptr, hooked_fread as *const c_void);
+    let fread_orig = patch_got_entry(fread_got_ptr, hooked_fread as *const c_void)
+        .expect("Could not make fread GOT entry writable");
     logd!("[*] GOT after: {:?}", *fread_got_ptr);
 
     logd!("[+] fread GOT patch applied: {:#x} -> {:?}", fread_got_offset, hooked_fread as *const c_void);
-    REAL_FREAD = Some(std::mem::transmute(fread_orig));
+    if REAL_FREAD.set(std::mem::transmute::<*const c_void, FreadType>(fread_orig)).is_err() {
+        logd!("[-] REAL_FREAD was already set; ignoring");
+    }
 
     logd!("[*] GOT entry for 'fread' offset = 0x{:x}", fread_got_offset);
     logd!("[*] Base of current process = 0x{:x}", base);
@@ -103,11 +109,11 @@ thread_local! {
 pub unsafe extern "C" fn hooked_fopen(path: *const c_char, mode: *const c_char) -> *mut FILE {
     if IN_FOPEN_HOOK.with(|c| c.get()) {
         logd!("[~] Reentrant fopen call");
-        return REAL_FOPEN.expect("REAL_FOPEN missing")(path, mode);
+        return REAL_FOPEN.get().expect("REAL_FOPEN missing")(path, mode);
     }
     IN_FOPEN_HOOK.with(|c| c.set(true));
 
-    let real_fopen = REAL_FOPEN.expect("REAL_FOPEN missing");
+    let real_fopen = *REAL_FOPEN.get().expect("REAL_FOPEN missing");
     let file = real_fopen(path, mode);
 
     let path_str = path.as_ref().map(|_| CStr::from_ptr(path).to_string_lossy()).unwrap_or("<null>".into());
@@ -134,7 +140,7 @@ pub unsafe extern "C" fn hooked_fread(
     nmemb: size_t,
     stream: *mut FILE,
 ) -> size_t {
-    let real_fread = REAL_FREAD.expect("REAL_FREAD missing");
+    let real_fread = *REAL_FREAD.get().expect("REAL_FREAD missing");
     let n = real_fread(ptr, size, nmemb, stream);
 
     if ptr.is_null() || size == 0 || nmemb == 0 {

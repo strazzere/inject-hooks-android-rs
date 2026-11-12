@@ -1,3 +1,4 @@
+mod android_log;
 mod hooks;
 mod patch;
 mod log;

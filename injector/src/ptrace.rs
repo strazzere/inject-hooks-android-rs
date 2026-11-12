@@ -158,7 +158,7 @@ mod arch64 {
     }
 
     // Simple page for tramp
-    static mut STUB_PAGE: u64 = 0;
+    static STUB_PAGE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     // Set LR (x30) = 0 so when the callee RETs it segfaults at 0 so we can catch halt
     // Read x0, restore regs then continue
@@ -193,9 +193,10 @@ mod arch64 {
     // Ensure we have a trampoline page; if not, get one
     // We resolve and call libc::mmap once using the LR-trap trick, then place our stubs there
     fn ensure_stub_page(pid: pid_t, libc_mmap_addr: u64) -> Result<u64> {
-        unsafe {
-            if STUB_PAGE != 0 { return Ok(STUB_PAGE); }
-        }
+        use std::sync::atomic::Ordering;
+
+        let existing = STUB_PAGE.load(Ordering::SeqCst);
+        if existing != 0 { return Ok(existing); }
 
         // mmap(NULL, 0x1000, PROT_RWX, MAP_PRIVATE|MAP_ANON, -1, 0) via libc mmap
         let page_sz = 0x1000u64;
@@ -215,7 +216,7 @@ mod arch64 {
         let sysc_stub = a64_syscall_stub();
         super::ptrace_write(pid, (addr + 8) as *mut u8, &sysc_stub)?;
 
-        unsafe { STUB_PAGE = addr; }
+        STUB_PAGE.store(addr, Ordering::SeqCst);
         Ok(addr)
     }
 
