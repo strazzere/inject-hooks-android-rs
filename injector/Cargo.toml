@@ -4,7 +4,7 @@ version = "1.0.0"
 edition = "2021"
 
 # Authors and other optional metadata
-authors = ["Tim Strazzere <tim@strazzere.com"]
+authors = ["Tim Strazzere <tim@strazzere.com>"]
 description = "Remotely inject a shared library into a running process"
 license = "Apache 2.0"
 repository = "https://github.com/strazzere/inject-hooks-android-rs/injector"

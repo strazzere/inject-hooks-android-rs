@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 # Authors and other optional metadata
-authors = ["Tim Strazzere <tim@strazzere.com"]
+authors = ["Tim Strazzere <tim@strazzere.com>"]
 description = "Hooking elf files in an automated way"
 license = "Apache 2.0"
 repository = "https://github.com/strazzere/inject-hooks-android-rs/hook"
@@ -14,7 +14,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 libc = "0.2"
-ctor = "0.7"
+ctor = "1.0"
 once_cell = "1.21.3"
 goblin = "0.10.5"
 memchr = "2.7.6"
