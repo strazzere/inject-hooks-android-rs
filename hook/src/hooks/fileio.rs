@@ -116,7 +116,7 @@ pub unsafe extern "C" fn hooked_fopen(path: *const c_char, mode: *const c_char) 
 
     logd!("[+] fopen checking: {} w/ {} ", path_str, mode_str);
     if !file.is_null()
-        && path_str.contains("/data/local/temp/")
+        && path_str.contains("/data/local/tmp/")
         && path_str.ends_with(".target")
     {
         logd!("[+] fopen matched: {}", path_str);
@@ -167,10 +167,24 @@ pub unsafe extern "C" fn hooked_fread(
         }
     };
 
-    let mut modified = false;
+    let modified = patch_secret_key(buf);
 
-    // If this specific phrase is sound, change it's value
-    // current target is secret_key="{anything}"
+    if modified {
+        logd!("Success: patched fread buffer in-place");
+    } else {
+        logd!("fread: no patching needed");
+    }
+
+    n
+}
+
+/// Find `secret_key="<anything>"` in `buf` and overwrite `<anything>` with
+/// `d1ff` in place, unless it is already `"0"`. Returns whether anything was
+/// patched. The matched value can be any length, so the write is clamped to
+/// `min(value_len, patch.len())` rather than requiring an exact match - a
+/// plain `copy_from_slice` would panic whenever the value isn't exactly 4
+/// bytes long (e.g. `secret_key="0"` or `secret_key="abcdefgh"`).
+fn patch_secret_key(buf: &mut [u8]) -> bool {
     let key = b"secret_key=\"";
     let mut key_matches = vec![];
     for pos in memmem::find_iter(buf, key) {
@@ -183,21 +197,16 @@ pub unsafe extern "C" fn hooked_fread(
             key_matches.push((val_start, val_end));
         }
     }
+
+    let mut modified = false;
     for (start, end) in key_matches {
         if &buf[start..end] != b"0" {
             logd!("[patch] {:?} found: {}..{} → patching", key, start, end);
-            // Note we're cheating a bit here with the a potentially unsafe copy into
-            // the quotes
-            buf[start..end].copy_from_slice(b"d1ff");
+            let patch = b"d1ff";
+            let n = (end - start).min(patch.len());
+            buf[start..start + n].copy_from_slice(&patch[..n]);
             modified = true;
         }
     }
-
-    if modified {
-        logd!("Success: patched fread buffer in-place");
-    } else {
-        logd!("fread: no patching needed");
-    }
-
-    n
+    modified
 }

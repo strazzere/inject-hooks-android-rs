@@ -14,6 +14,7 @@ fn main() {
     ];
 
     let mut init_calls = String::new();
+    let mut mod_decls = String::new();
 
     for entry in fs::read_dir(hooks_path).unwrap() {
         let entry = entry.unwrap();
@@ -31,6 +32,14 @@ fn main() {
                     stem.to_string()
                 };
 
+                // `mod` paths in code brought in via `include!` resolve relative to
+                // OUT_DIR, not src/hooks/, so point each module at its real file
+                // explicitly with an absolute #[path].
+                mod_decls.push_str(&format!(
+                    "#[path = {:?}]\npub mod {};\n",
+                    path.canonicalize().unwrap().to_str().unwrap(),
+                    ident
+                ));
                 init_calls.push_str(&format!("        crate::hooks::{}::init();\n", ident));
             }
         }
@@ -38,6 +47,7 @@ fn main() {
 
     let output = format!(
         r#"
+{mod_decls}
 use std::sync::Once;
 
 static INIT: Once = Once::new();
@@ -47,6 +57,7 @@ pub fn init() {{
 {init_calls}    }});
 }}
 "#,
+        mod_decls = mod_decls,
         init_calls = init_calls
     );
 

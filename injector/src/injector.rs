@@ -75,7 +75,21 @@ pub fn get_linker_path() -> String {
 pub fn inject_library(pid: pid_t, library_path: &str) -> Result<u64, Box<dyn std::error::Error>> {
     ptrace_attach(pid)?;
 
-    let handle = call_dlopen(pid, library_path)?;
+    // Always detach, even if dlopen fails partway through - otherwise the
+    // tracee is left PTRACE_ATTACH'd (and stopped) indefinitely.
+    let result = call_dlopen(pid, library_path);
+
+    if let Err(e) = ptrace_detach(pid) {
+        #[cfg(debug_assertions)]
+        eprintln!("[inject] detach failed: {}", e);
+        // Prefer surfacing the original error if dlopen already failed;
+        // otherwise surface the detach failure.
+        if result.is_ok() {
+            return Err(Box::new(e));
+        }
+    }
+
+    let handle = result?;
 
     #[cfg(debug_assertions)]
     {
@@ -86,7 +100,6 @@ pub fn inject_library(pid: pid_t, library_path: &str) -> Result<u64, Box<dyn std
         }
     }
 
-    ptrace_detach(pid)?;
     Ok(handle)
 }
 
