@@ -7,8 +7,8 @@ pub fn exposed_function() {
     crate::hooks::init();
 }
 
-#[ctor::ctor]
-unsafe fn ctor_init() {
+#[ctor::ctor(unsafe)]
+fn ctor_init() {
     logd!("Running init");
     exposed_function();
 }
